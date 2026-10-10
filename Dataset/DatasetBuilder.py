@@ -1,7 +1,10 @@
 """Coleta filmes populares do TMDB sem expor a credencial no código."""
 import argparse
+import base64
 import csv
+import json
 import os
+import re
 from pathlib import Path
 
 import requests
@@ -9,16 +12,45 @@ import requests
 FIELDS = ['id', 'title', 'overview', 'release_date', 'vote_average', 'poster_path']
 
 
-def collect_movies(api_key, pages=14):
+def api_v3_key_from_jwt(token):
+    """Obtém a chave v3 que o TMDB inclui no campo aud de alguns JWTs."""
+    try:
+        payload = token.split('.')[1]
+        payload += '=' * (-len(payload) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(payload))
+    except (IndexError, ValueError, json.JSONDecodeError):
+        return None
+    audience = claims.get('aud')
+    if isinstance(audience, str) and re.fullmatch(r'[a-fA-F0-9]{32}', audience):
+        return audience
+    return None
+
+
+def collect_movies(api_key, pages=38):
     movies = {}
+    # Alguns JWTs do TMDB carregam a chave v3 no campo aud. Nesse caso, use-a
+    # como api_key, tal como no exemplo da API v3; outros JWTs usam Bearer.
+    embedded_key = api_v3_key_from_jwt(api_key) if api_key.count('.') == 2 else None
+    v3_key = embedded_key or (None if api_key.count('.') == 2 else api_key)
+    headers = (None if v3_key else {'Authorization': f'Bearer {api_key}'})
     for page in range(1, pages + 1):
+        params = {'language': 'pt-BR', 'page': page}
+        if v3_key:
+            params['api_key'] = v3_key
         response = requests.get(
             'https://api.themoviedb.org/3/movie/popular',
-            params={'api_key': api_key, 'language': 'pt-BR', 'page': page},
+            params=params, headers=headers,
             timeout=30)
         # Não imprime a URL da resposta, pois ela contém a credencial.
         if not response.ok:
-            raise RuntimeError(f'TMDB retornou HTTP {response.status_code} na página {page}.')
+            try:
+                detail = response.json().get('status_message', '')
+            except ValueError:
+                detail = ''
+            message = f'TMDB retornou HTTP {response.status_code} na página {page}.'
+            if detail:
+                message += f' {detail}'
+            raise RuntimeError(message)
         payload = response.json()
         if not isinstance(payload.get('results'), list):
             raise ValueError(f'Resposta inválida na página {page}.')
@@ -56,7 +88,7 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix('.tmp.csv')
     with temporary.open('w', encoding='utf-8', newline='') as target:
-        writer = csv.DictWriter(target, fieldnames=FIELDS)
+        writer = csv.DictWriter(target, fieldnames=FIELDS, lineterminator='\n')
         writer.writeheader()
         writer.writerows(movies)
     temporary.replace(args.output)

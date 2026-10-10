@@ -29,7 +29,14 @@ class SentenceBERT:
     def prepare(self, batch_size=32):
         """Única fase que baixa o modelo e codifica os filmes."""
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        vectors = self._encoder(offline=False).encode(
+        try:
+            # Reutiliza primeiro uma cópia local para que atualizar o corpus
+            # não dependa de rede quando o modelo já foi baixado.
+            encoder = self._encoder(offline=True)
+        except (OSError, ValueError):
+            self.encoder = None
+            encoder = self._encoder(offline=False)
+        vectors = encoder.encode(
             [document_text(movie) for movie in self.movies],
             batch_size=batch_size, normalize_embeddings=True,
             convert_to_numpy=True, show_progress_bar=True)

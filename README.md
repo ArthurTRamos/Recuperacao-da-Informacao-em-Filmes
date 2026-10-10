@@ -71,21 +71,34 @@ história e uma paráfrase com sinônimos. Observe quais filmes mudam de posiç�
 varie o número de candidatos do híbrido. Não há uma estratégia sempre vencedora;
 para medir qualidade, é preciso julgar a relevância dos resultados para as consultas.
 O carregamento ignora repetições de título e sinopse, mantendo a primeira ocorrência
-e preservando o CSV original (259 registros, 215 filmes distintos). Não há curadoria
-ou classificação etária automática.
+e preservando o CSV original. Não há curadoria ou classificação etária automática.
 
 ## Dataset e TMDB
 
 `Dataset/movies_ptbr.csv` deve conter `id`, `title` e `overview`; ano, nota e
 URL de pôster são metadados opcionais. O coletor preserva IDs do TMDB, remove
-duplicatas e filmes sem sinopse e só executa quando chamado explicitamente.
-A credencial é lida do ambiente:
+duplicatas e filmes sem sinopse. Ele só faz requisições ao TMDB quando você o
+executa. Obtenha uma chave v3 ou um token de leitura Bearer v4 do TMDB e, na raiz
+do projeto, ative o ambiente virtual e defina a credencial no mesmo terminal em
+que rodará o script:
 
 ```bash
+source .venv/bin/activate
 export TMDB_API_KEY="sua_chave"
 python Dataset/DatasetBuilder.py --pages 14
+# Recalcula os embeddings para o CSV atualizado
 python main.py --prepare
 ```
+
+O coletor aceita chaves v3 no parâmetro `api_key`. Se você fornecer um JWT cujo
+campo `aud` contenha uma chave v3, o coletor usa essa chave; outros tokens JWT
+são enviados no cabeçalho `Authorization: Bearer`. No PowerShell, use
+`$env:TMDB_API_KEY="sua_chave_ou_token"` para definir a variável e
+ative o ambiente virtual com `.venv\Scripts\Activate.ps1`. O script grava ou
+substitui `Dataset/movies_ptbr.csv`; `--pages` controla quantas páginas de filmes
+populares buscar (o padrão é 14). Depois da coleta, execute `python main.py
+--prepare` para gerar embeddings compatíveis com o novo dataset antes de abrir
+a aplicação.
 
 ## Validação
 
