@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATASET = ROOT / 'Dataset' / 'movies_ptbr.csv'
-DEFAULT_CACHE = ROOT / 'Modelos' / 'artefatos'
+DEFAULT_CACHE = Path(__file__).resolve().parent / 'artefatos'
 
 
 def load_movies(path=DEFAULT_DATASET):
@@ -25,7 +25,8 @@ def load_movies(path=DEFAULT_DATASET):
             if not row['title'] or not row['overview']:
                 raise ValueError(f"Título ou sinopse ausente na linha {line}.")
             ids.add(movie_id)
-            document = (row['title'].strip().casefold(), row['overview'].strip().casefold())
+            document = (row['title'].strip().casefold(), row['overview'].strip().casefold(),
+                        (row.get('genres') or '').strip().casefold())
             if document in documents:
                 continue
             documents.add(document)
@@ -36,7 +37,13 @@ def load_movies(path=DEFAULT_DATASET):
 
 
 def document_text(movie):
-    return f"{movie['title']}. {movie['overview']}"
+    genres = movie.get('genres') or ''
+    if isinstance(genres, (list, tuple)):
+        genres = ', '.join(str(genre) for genre in genres if genre)
+    else:
+        genres = str(genres).replace('|', ', ').strip()
+    genre_context = f"Gêneros: {genres}. " if genres else ''
+    return f"{genre_context}{movie['title']}. {movie['overview']}"
 
 
 def corpus_fingerprint(movies):

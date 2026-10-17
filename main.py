@@ -6,9 +6,9 @@ from pathlib import Path
 import subprocess
 import sys
 
-from Modelos.Corpus import DEFAULT_CACHE, DEFAULT_DATASET, load_movies
-from Modelos.Retrieval import Retrieval
-from Modelos.SentenceBERT import DEFAULT_MODEL
+from Models.Corpus import DEFAULT_CACHE, DEFAULT_DATASET, load_movies
+from Models.Retrieval import Retrieval
+from Models.SentenceBERT import DEFAULT_MODEL
 
 EXPLANATIONS = {
     'BM25': 'Busca palavras em comum no título e na sinopse. Palavras mais raras pesam mais.',

@@ -27,6 +27,12 @@ class Retrieval:
             'BM25 + Sentence-BERT (RRF)': self.hybrid.search(
                 query, top_k, candidate_k, vector),
         }
-        return {name: [{**self.movies[movie_id], 'score': score, 'rank': rank}
-                       for rank, (movie_id, score) in enumerate(items, 1)]
-                for name, items in rankings.items()}
+        results = {}
+        for name, items in rankings.items():
+            results[name] = []
+            for rank, (movie_id, score) in enumerate(items, 1):
+                result = {**self.movies[movie_id], 'score': score, 'rank': rank}
+                if name == 'BM25':
+                    result['matched_terms'] = self.bm25.matching_query_terms(query, movie_id)
+                results[name].append(result)
+        return results

@@ -21,11 +21,15 @@ class InvertedIndex:
         for movie in movies:
             if isinstance(movie, dict):
                 movie_id, title, overview = movie['id'], movie['title'], movie['overview']
+                genres = movie.get('genres', '')
             else:
                 movie_id, title, overview = movie[:3]
+                genres = movie[3] if len(movie) > 3 else ''
             if movie_id in self.document_length:
                 raise ValueError(f"ID de filme duplicado: {movie_id}")
-            words = preprocess(f"{title} {overview}")
+            if isinstance(genres, (list, tuple)):
+                genres = ' '.join(str(genre) for genre in genres)
+            words = preprocess(f"{title} {overview} {genres or ''}")
             self.document_length[movie_id] = len(words)
             for word, frequency in Counter(words).items():
                 self.index.setdefault(word, {})[movie_id] = frequency

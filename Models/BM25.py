@@ -1,7 +1,7 @@
 """BM25: IDF, saturação de frequência e normalização pelo tamanho."""
 import math
 
-from .Preprocess import preprocess
+from .Preprocess import preprocess, remove_stopwords, stemming, tokenization
 
 
 class BM25:
@@ -26,6 +26,17 @@ class BM25:
     def score(self, query, movie_id):
         return sum(self._term_score(word, movie_id)
                    for word in set(preprocess(query)))
+
+    def matching_query_terms(self, query, movie_id):
+        """Termos visíveis da consulta cujas raízes estão no documento."""
+        terms = remove_stopwords(tokenization(query))
+        stems = stemming(terms)
+        matches, seen = [], set()
+        for term, stem in zip(terms, stems):
+            if (term not in seen and movie_id in self.inverted_index.index.get(stem, {})):
+                matches.append(term)
+                seen.add(term)
+        return matches
 
     def search(self, query, top_k=5):
         if top_k < 1:

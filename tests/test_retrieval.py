@@ -10,13 +10,13 @@ from unittest.mock import patch
 import numpy as np
 
 from main import main
-from Modelos.BM25 import BM25
-from Modelos.Corpus import load_movies
-from Modelos.Hybrid import Hybrid
-from Modelos.InvertedIndex import InvertedIndex
-from Modelos.Preprocess import preprocess
-from Modelos.Retrieval import Retrieval
-from Modelos.SentenceBERT import SentenceBERT
+from Models.BM25 import BM25
+from Models.Corpus import load_movies
+from Models.Hybrid import Hybrid
+from Models.InvertedIndex import InvertedIndex
+from Models.Preprocess import preprocess
+from Models.Retrieval import Retrieval
+from Models.SentenceBERT import SentenceBERT
 
 MOVIES = [
     {'id': 11, 'title': 'Espaço', 'overview': 'Viagem espacial'},

@@ -1,11 +1,12 @@
 """Interface web em Streamlit para comparar os três rankings de filmes."""
+import html
 import os
 
 import streamlit as st
 
-from Modelos.Corpus import DEFAULT_CACHE, DEFAULT_DATASET, load_movies
-from Modelos.Retrieval import Retrieval
-from Modelos.SentenceBERT import DEFAULT_MODEL
+from Models.Corpus import DEFAULT_CACHE, DEFAULT_DATASET, load_movies
+from Models.Retrieval import Retrieval
+from Models.SentenceBERT import DEFAULT_MODEL
 from main import EXPLANATIONS
 
 st.set_page_config(page_title='Batalha de Algoritmos', page_icon='⚔️', layout='wide')
@@ -32,7 +33,7 @@ def choose_example(value):
     st.session_state['run_search'] = True
 
 
-def show_movie(movie, score_label):
+def show_movie(movie, method, score_label):
     with st.container(border=True):
         poster, details = st.columns([1, 2.4], gap='small')
         with poster:
@@ -49,6 +50,28 @@ def show_movie(movie, score_label):
             st.markdown(f"**{movie['rank']}. {title}** ({year})" if year
                         else f"**{movie['rank']}. {title}**")
             st.caption(f"{score_label}: {movie['score']:.4f}")
+            if method == 'BM25':
+                terms = movie.get('matched_terms', [])
+                st.markdown('**🔎 Palavras da busca encontradas**')
+                if terms:
+                    badges = ''.join(
+                        '<span style="display:inline-block;background:#fee2e2;color:#991b1b;'
+                        'border:1px solid #fecaca;border-radius:999px;padding:2px 9px;'
+                        'margin:2px 4px 2px 0;font-size:0.85rem">'
+                        f'{html.escape(term)}</span>' for term in terms)
+                    st.markdown(badges, unsafe_allow_html=True)
+                    st.caption('Correspondências após o pré-processamento do BM25.')
+                else:
+                    st.caption('Nenhum termo da consulta correspondeu a este filme.')
+            elif method == 'Sentence-BERT':
+                # Cosine is in [-1, 1] for normalized vectors. Map it linearly
+                # to a display-only 0-100 index, not a calibrated probability.
+                index = max(0.0, min(100.0, (movie['score'] + 1.0) * 50.0))
+                st.progress(index / 100.0,
+                            text=f'Índice cosseno: {index:.1f}% (não é probabilidade)')
+            genres = movie.get('genres') or ''
+            if genres:
+                st.caption('🎭 ' + ', '.join(g.strip() for g in genres.split('|') if g.strip()))
             with st.expander('Ver sinopse'):
                 st.write(movie['overview'])
 
@@ -127,7 +150,7 @@ def main():
                 if not items:
                     st.info('Nenhum filme encontrado para esta pesquisa.')
                 for movie in items:
-                    show_movie(movie, score_label)
+                    show_movie(movie, key, score_label)
 
 
 if __name__ == '__main__':
