@@ -1,7 +1,7 @@
 # Cinema em busca
 
 Aplicação Streamlit para comparar buscas de filmes em português com BM25,
-Sentence-BERT e a fusão RRF. Os modelos estão em `Modelos/`.
+Sentence-BERT com multilingual-E5-base e a fusão RRF. Os modelos estão em `Models/`.
 
 ## Instalação e uso
 
@@ -22,6 +22,10 @@ python main.py --query "viagem no tempo" --method bm25
 
 O primeiro comando compara as três estratégias; `--method bm25` funciona sem
 embeddings. Após alterar o dataset, execute `python main.py --prepare` novamente.
+Exporte os tokens usados por filme com `python main.py --token-counts`; o CSV é
+salvo em `Dataset/semantic_token_counts.csv`. O arquivo informa tokens gerados,
+tokens usados após truncagem e o limite do modelo. Gere os embeddings primeiro;
+esse comando usa o modelo já baixado e substitui as contagens anteriores.
 
 ## Estratégias
 
@@ -29,8 +33,10 @@ embeddings. Após alterar o dataset, execute `python main.py --prepare` novament
 - **Sentence-BERT:** compara a similaridade de cosseno entre a consulta e cada filme.
 - **RRF:** funde as posições dos rankings BM25 e Sentence-BERT com `1 / (60 + posição)`.
 
-BM25 e Sentence-BERT usam título, sinopse e gêneros. O coletor salva gêneros
-em português no campo `genres`; após atualizar o CSV, recalcule os embeddings.
+BM25 e Sentence-BERT usam título, sinopse e gêneros. Para a busca semântica,
+os campos são rotulados e o E5 recebe `query:` nas consultas e `passage:` nos
+filmes. O coletor salva gêneros em português no campo `genres`; após atualizar
+o CSV ou trocar o modelo, execute `python main.py --prepare` para recalcular os embeddings.
 
 As pontuações têm escalas diferentes; compare as posições. No híbrido, `--candidates`
 define a profundidade de cada ranking antes da fusão (padrão: 30).

@@ -21,12 +21,14 @@ class Retrieval:
         if self.semantic.embeddings is None:
             self.semantic.load()
         vector = self.semantic.encode_query(query)
+        hybrid_items = self.hybrid.search_with_ranks(query, top_k, candidate_k, vector)
         rankings = {
             'BM25': self.bm25.search(query, top_k),
             'Sentence-BERT': self.semantic.search(query, top_k, query_vector=vector),
-            'BM25 + Sentence-BERT (RRF)': self.hybrid.search(
-                query, top_k, candidate_k, vector),
+            'BM25 + Sentence-BERT (RRF)': [item[:2] for item in hybrid_items],
         }
+        hybrid_ranks = {item[0]: {'bm25_rank': item[2], 'sentence_bert_rank': item[3]}
+                        for item in hybrid_items}
         results = {}
         for name, items in rankings.items():
             results[name] = []
@@ -34,5 +36,8 @@ class Retrieval:
                 result = {**self.movies[movie_id], 'score': score, 'rank': rank}
                 if name == 'BM25':
                     result['matched_terms'] = self.bm25.matching_query_terms(query, movie_id)
+                elif name == 'BM25 + Sentence-BERT (RRF)':
+                    result.update(hybrid_ranks[movie_id])
+                    result['rank_cutoff'] = candidate_k
                 results[name].append(result)
         return results
