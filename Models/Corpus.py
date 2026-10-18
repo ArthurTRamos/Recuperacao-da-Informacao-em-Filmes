@@ -37,13 +37,17 @@ def load_movies(path=DEFAULT_DATASET):
 
 
 def document_text(movie):
+    """Representação estruturada do filme enviada ao encoder semântico."""
     genres = movie.get('genres') or ''
     if isinstance(genres, (list, tuple)):
-        genres = ', '.join(str(genre) for genre in genres if genre)
+        genre_names = [str(genre).strip() for genre in genres if genre]
     else:
-        genres = str(genres).replace('|', ', ').strip()
-    genre_context = f"Gêneros: {genres}. " if genres else ''
-    return f"{genre_context}{movie['title']}. {movie['overview']}"
+        genre_names = [genre.strip() for genre in str(genres).split('|') if genre.strip()]
+    fields = [f"Título: {movie['title']}"]
+    if genre_names:
+        fields.append(f"Gêneros: {', '.join(genre_names)}")
+    fields.append(f"Sinopse: {movie['overview']}")
+    return '. '.join(fields)
 
 
 def corpus_fingerprint(movies):

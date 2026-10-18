@@ -60,7 +60,6 @@ def show_movie(movie, method, score_label):
                         'margin:2px 4px 2px 0;font-size:0.85rem">'
                         f'{html.escape(term)}</span>' for term in terms)
                     st.markdown(badges, unsafe_allow_html=True)
-                    st.caption('Correspondências após o pré-processamento do BM25.')
                 else:
                     st.caption('Nenhum termo da consulta correspondeu a este filme.')
             elif method == 'Sentence-BERT':
@@ -69,6 +68,15 @@ def show_movie(movie, method, score_label):
                 index = max(0.0, min(100.0, (movie['score'] + 1.0) * 50.0))
                 st.progress(index / 100.0,
                             text=f'Índice cosseno: {index:.1f}% (não é probabilidade)')
+            elif method == 'BM25 + Sentence-BERT (RRF)':
+                cutoff = movie.get('rank_cutoff', 0)
+                bm25_rank = movie.get('bm25_rank')
+                semantic_rank = movie.get('sentence_bert_rank')
+                bm25_position = f'#{bm25_rank}' if bm25_rank else f'fora do top {cutoff}'
+                semantic_position = (f'#{semantic_rank}' if semantic_rank
+                                     else f'fora do top {cutoff}')
+                st.info(f'Posições antes da fusão — BM25: **{bm25_position}** · '
+                        f'Sentence-BERT: **{semantic_position}**', icon='📍')
             genres = movie.get('genres') or ''
             if genres:
                 st.caption('🎭 ' + ', '.join(g.strip() for g in genres.split('|') if g.strip()))

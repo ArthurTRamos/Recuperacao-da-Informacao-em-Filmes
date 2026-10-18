@@ -11,7 +11,7 @@ import numpy as np
 
 from main import main
 from Models.BM25 import BM25
-from Models.Corpus import load_movies
+from Models.Corpus import document_text, load_movies
 from Models.Hybrid import Hybrid
 from Models.InvertedIndex import InvertedIndex
 from Models.Preprocess import preprocess
@@ -81,6 +81,15 @@ class SemanticTests(unittest.TestCase):
         self.assertAlmostEqual(result[1][1], 0.8, places=6)
         self.assertEqual(len(self.encoder.calls), 2)
         self.assertIsInstance(self.encoder.calls[-1], str)
+        self.assertEqual(self.encoder.calls[0][0],
+                         'passage: Título: Espaço. Sinopse: Viagem espacial')
+        self.assertEqual(self.encoder.calls[-1], 'query: ideia')
+
+    def test_document_text_labels_title_genres_and_overview(self):
+        movie = {'title': 'Filme', 'genres': 'Fantasia | Aventura',
+                 'overview': 'Uma jornada.'}
+        self.assertEqual(document_text(movie),
+                         'Título: Filme. Gêneros: Fantasia, Aventura. Sinopse: Uma jornada.')
 
     def test_stale_corpus_order_and_model_rejected(self):
         for movies, name in [
@@ -105,7 +114,9 @@ class SemanticTests(unittest.TestCase):
         hybrid = Hybrid(bm25, self.model)
         self.assertEqual(self.model.search('viagem')[0][0], 33)
         self.assertEqual(hybrid.search('viagem', top_k=1, candidate_k=2)[0][0], 11)
-        self.assertEqual(hybrid.search('xyz'), [])
+        # RRF unions both rankings, so a semantic result can appear even when
+        # BM25 has no lexical match.
+        self.assertTrue(hybrid.search('xyz'))
         # Ao incluir ambos os candidatos, o filme 33 sobe pelo cosseno.
         self.assertEqual(hybrid.search('espaço', top_k=1, candidate_k=2)[0][0], 33)
         with self.assertRaises(ValueError):
@@ -131,7 +142,7 @@ class ApplicationTests(unittest.TestCase):
     def test_real_dataset_and_cli_without_encoder(self):
         movies = load_movies()
         self.assertGreater(len(movies), 0)
-        with patch('Modelos.SentenceBERT.SentenceBERT._encoder', side_effect=AssertionError('encoder loaded')):
+        with patch('Models.SentenceBERT.SentenceBERT._encoder', side_effect=AssertionError('encoder loaded')):
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 code = main(['--query', 'espaço', '--method', 'bm25', '--json'])

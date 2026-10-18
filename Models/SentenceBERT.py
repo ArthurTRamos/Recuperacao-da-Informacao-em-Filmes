@@ -6,7 +6,7 @@ import numpy as np
 
 from .Corpus import DEFAULT_CACHE, corpus_fingerprint, document_text
 
-DEFAULT_MODEL = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+DEFAULT_MODEL = 'intfloat/multilingual-e5-base'
 
 
 class SentenceBERT:
@@ -37,11 +37,11 @@ class SentenceBERT:
             self.encoder = None
             encoder = self._encoder(offline=False)
         vectors = encoder.encode(
-            [document_text(movie) for movie in self.movies],
+            [f'passage: {document_text(movie)}' for movie in self.movies],
             batch_size=batch_size, normalize_embeddings=True,
             convert_to_numpy=True, show_progress_bar=True)
         vectors = np.asarray(vectors, dtype=np.float32)
-        metadata = json.dumps({'version': 1, 'model': self.model_name,
+        metadata = json.dumps({'version': 2, 'model': self.model_name,
                                'corpus': corpus_fingerprint(self.movies),
                                'ids': [movie['id'] for movie in self.movies]})
         target = self.cache_dir / 'embeddings.npz'
@@ -58,7 +58,7 @@ class SentenceBERT:
         with np.load(target, allow_pickle=False) as cache:
             metadata = json.loads(str(cache['metadata'].item()))
             vectors = cache['embeddings'].copy()
-        expected = {'version': 1, 'model': self.model_name,
+        expected = {'version': 2, 'model': self.model_name,
                     'corpus': corpus_fingerprint(self.movies),
                     'ids': [movie['id'] for movie in self.movies]}
         if metadata != expected:
@@ -72,7 +72,8 @@ class SentenceBERT:
 
     def encode_query(self, query):
         return np.asarray(self._encoder().encode(
-            query, normalize_embeddings=True, convert_to_numpy=True), dtype=np.float32)
+            f'query: {query}', normalize_embeddings=True,
+            convert_to_numpy=True), dtype=np.float32)
 
     def search(self, query, top_k=5, candidate_ids=None, query_vector=None):
         if top_k < 1:

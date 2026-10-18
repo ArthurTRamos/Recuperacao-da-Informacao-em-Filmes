@@ -9,6 +9,7 @@ import sys
 from Models.Corpus import DEFAULT_CACHE, DEFAULT_DATASET, load_movies
 from Models.Retrieval import Retrieval
 from Models.SentenceBERT import DEFAULT_MODEL
+from Models.TokenCounts import DEFAULT_OUTPUT, export_dataset_token_counts
 
 EXPLANATIONS = {
     'BM25': 'Busca palavras em comum no título e na sinopse. Palavras mais raras pesam mais.',
@@ -45,6 +46,8 @@ def main(argv=None):
     parser.add_argument('--cache-dir', type=str, default=str(DEFAULT_CACHE))
     parser.add_argument('--model', default=DEFAULT_MODEL)
     parser.add_argument('--prepare', action='store_true', help='Baixa o modelo e pré-calcula embeddings.')
+    parser.add_argument('--token-counts', nargs='?', const=str(DEFAULT_OUTPUT), metavar='CSV',
+                        help='Exporta tokens SBERT por filme (padrão: Dataset/semantic_token_counts.csv).')
     parser.add_argument('--query', help='Executa a consulta no terminal; sem esta opção, abre o Streamlit.')
     parser.add_argument('--method', choices=['all', 'bm25'], default='all')
     parser.add_argument('--top-k', type=int, default=5)
@@ -61,6 +64,18 @@ def main(argv=None):
             return 0
         except Exception as exc:
             print(f'Erro ao preparar embeddings: {exc}', file=sys.stderr)
+            return 1
+    if args.token_counts is not None:
+        try:
+            path, rows = export_dataset_token_counts(
+                output=args.token_counts, dataset=args.dataset,
+                cache_dir=args.cache_dir, model_name=args.model)
+            truncated = sum(row['truncated'] for row in rows)
+            print(f'{len(rows)} filmes exportados para {path} '
+                  f'({truncated} documentos truncados pelo modelo).')
+            return 0
+        except Exception as exc:
+            print(f'Erro ao contar tokens: {exc}', file=sys.stderr)
             return 1
     if args.query is None:
         return launch_web(args)
