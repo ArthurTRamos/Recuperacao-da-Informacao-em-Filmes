@@ -41,6 +41,12 @@ o CSV ou trocar o modelo, execute `python main.py --prepare` para recalcular os 
 As pontuações têm escalas diferentes; compare as posições. No híbrido, `--candidates`
 define a profundidade de cada ranking antes da fusão (padrão: 30).
 
+Os três atalhos demonstram busca semântica (Nemo), léxica (Harry Potter) e geral
+(Toy Story). A aba **Mapa de significados** projeta os embeddings em 2D com PCA,
+destacando a consulta e os resultados semânticos. O mapa é uma aproximação;
+o ranking continua usando os vetores completos e a similaridade de cosseno.
+Veja o [roteiro de apresentação para crianças](ROTEIRO_APRESENTACAO.md).
+
 ## Atualizar o dataset
 
 Defina `TMDB_API_KEY` com uma chave v3 ou token de leitura do TMDB (necessário criação de conta no site da API do TMDB). O coletor aceita chave v3 diretamente e extrai a chave do campo `aud` de JWTs compatíveis.

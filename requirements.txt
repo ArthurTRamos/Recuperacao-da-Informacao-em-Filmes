@@ -3,3 +3,4 @@ numpy>=1.26,<3
 sentence-transformers>=3,<6
 requests>=2.31,<3
 streamlit>=1.30,<2
+altair>=5,<7

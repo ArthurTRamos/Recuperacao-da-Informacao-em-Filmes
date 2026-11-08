@@ -13,14 +13,14 @@ class Retrieval:
         self.semantic = SentenceBERT(movies, cache_dir, model_name)
         self.hybrid = Hybrid(self.bm25, self.semantic)
 
-    def compare(self, query, top_k=5, candidate_k=30):
+    def compare(self, query, top_k=5, candidate_k=30, query_vector=None):
         if not query.strip():
             raise ValueError("Digite uma consulta sobre o filme que procura.")
         if top_k < 1 or candidate_k < top_k:
             raise ValueError("Use top_k positivo e candidatos >= top_k.")
         if self.semantic.embeddings is None:
             self.semantic.load()
-        vector = self.semantic.encode_query(query)
+        vector = self.semantic.encode_query(query) if query_vector is None else query_vector
         hybrid_items = self.hybrid.search_with_ranks(query, top_k, candidate_k, vector)
         rankings = {
             'BM25': self.bm25.search(query, top_k),

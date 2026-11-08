@@ -133,6 +133,14 @@ class SemanticTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.compare(' ')
 
+    def test_compare_accepts_the_same_vector_used_in_the_map(self):
+        service = Retrieval(MOVIES, self.directory.name)
+        with patch.object(service.semantic, 'encode_query',
+                          side_effect=AssertionError('query encoded twice')):
+            rankings = service.compare('espaço', top_k=2, candidate_k=2,
+                                       query_vector=np.array([0, 1], dtype=np.float32))
+        self.assertEqual(rankings['Sentence-BERT'][0]['id'], 33)
+
     def test_missing_cache_actionable(self):
         with self.assertRaisesRegex(ValueError, '--prepare'):
             SentenceBERT(MOVIES, Path(self.directory.name) / 'missing').load()
