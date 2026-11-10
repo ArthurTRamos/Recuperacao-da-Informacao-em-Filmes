@@ -3,10 +3,11 @@ import html
 import os
 
 import altair as alt
+import numpy as np
 import streamlit as st
 
 from Models.Corpus import DEFAULT_CACHE, DEFAULT_DATASET, load_movies
-from Models.EmbeddingMap import project_embeddings
+from Models.EmbeddingMap import project_embeddings, radial_coordinates
 from Models.Retrieval import Retrieval
 from Models.SentenceBERT import DEFAULT_MODEL
 from main import EXPLANATIONS
@@ -46,15 +47,26 @@ def choose_example(value):
     st.session_state['run_search'] = True
 
 
-def show_embedding_map(service, rankings, query, query_vector):
-    st.subheader('Um mapa de significados')
-    st.write('Cada ponto é um filme. O computador transforma título, gêneros e sinopse '
-             'em uma lista de números chamada embedding. Aqui, resumimos esses números '
-             'em um mapa para explorar ideias parecidas.')
+def show_embedding_map(service, rankings, query, query_vector, radial=False):
+    st.subheader('Proximidade à sua busca' if radial else 'Um mapa de significados')
+    if radial and query_vector is None:
+        st.info('Faça uma busca para ver os filmes ao redor da sua consulta.')
+        return
+    if radial:
+        st.write('Sua consulta fica no centro. Quanto mais perto um filme estiver dela, '
+                 'maior é sua similaridade semântica no espaço completo dos embeddings.')
+    else:
+        st.write('Cada ponto é um filme. O computador transforma título, gêneros e sinopse '
+                 'em uma lista de números chamada embedding. Aqui, resumimos esses números '
+                 'em um mapa para explorar ideias parecidas.')
     try:
         if service.semantic.embeddings is None:
             service.semantic.load()
         projection = get_projection(service.semantic.embeddings)
+        scores = (np.clip(service.semantic.embeddings @ query_vector, -1, 1)
+                  if radial else None)
+        movie_coordinates = (radial_coordinates(projection, query_vector, scores)
+                             if radial else projection.coordinates)
     except Exception as exc:
         st.info(f'Não foi possível montar o mapa: {exc}')
         return
@@ -62,35 +74,43 @@ def show_embedding_map(service, rankings, query, query_vector):
     hits = rankings.get('Sentence-BERT', []) if rankings else []
     hits_by_id = {movie['id']: movie for movie in hits}
     records = []
-    for movie, coordinates in zip(service.semantic.movies, projection.coordinates):
+    for index, (movie, coordinates) in enumerate(zip(service.semantic.movies, movie_coordinates)):
         hit = hits_by_id.get(movie['id'])
         records.append({
             'x': float(coordinates[0]), 'y': float(coordinates[1]),
             'title': movie['title'], 'genres': movie.get('genres', ''),
             'rank': hit['rank'] if hit else None,
-            'score': hit['score'] if hit else None,
+            'score': float(scores[index]) if radial else (hit['score'] if hit else None),
+            'distance': float(np.linalg.norm(coordinates)) if radial else None,
             'group': 'Resultado semântico' if hit else 'Outros filmes',
         })
     if query_vector is not None:
-        coordinates = projection.transform(query_vector)
+        coordinates = np.zeros(2) if radial else projection.transform(query_vector)
         records.append({'x': float(coordinates[0]), 'y': float(coordinates[1]),
                         'title': f'Sua busca: {query}', 'genres': '',
-                        'rank': None, 'score': None, 'group': 'Sua busca'})
+                        'rank': None, 'score': None, 'distance': 0 if radial else None,
+                        'group': 'Sua busca'})
     else:
         st.info('Faça uma busca para colocar sua ideia no mapa e destacar os resultados.')
 
     nearby_only = st.checkbox('Mostrar só a consulta e os resultados semânticos',
-                              disabled=not hits)
+                              disabled=not hits, key='radial_only' if radial else 'pca_only')
     if nearby_only and hits:
         records = [record for record in records if record['group'] != 'Outros filmes']
 
+    extent = max(0.1, max((abs(record[axis]) for record in records
+                          for axis in ('x', 'y')), default=0) * 1.1) if radial else None
+    scale = alt.Scale(domain=[-extent, extent], nice=False) if radial else alt.Scale(zero=False)
+    tooltips = [alt.Tooltip('title:N', title='Filme / consulta'),
+                alt.Tooltip('genres:N', title='Gêneros'),
+                alt.Tooltip('rank:Q', title='Posição semântica', format='.0f'),
+                alt.Tooltip('score:Q', title='Cosseno original', format='.4f')]
+    if radial:
+        tooltips.append(alt.Tooltip('distance:Q', title='Distância à consulta', format='.4f'))
     base = alt.Chart(alt.Data(values=records)).encode(
-        x=alt.X('x:Q', axis=None, scale=alt.Scale(zero=False)),
-        y=alt.Y('y:Q', axis=None, scale=alt.Scale(zero=False)),
-        tooltip=[alt.Tooltip('title:N', title='Filme / consulta'),
-                 alt.Tooltip('genres:N', title='Gêneros'),
-                 alt.Tooltip('rank:Q', title='Posição semântica', format='.0f'),
-                 alt.Tooltip('score:Q', title='Cosseno original', format='.4f')])
+        x=alt.X('x:Q', axis=None, scale=scale),
+        y=alt.Y('y:Q', axis=None, scale=scale),
+        tooltip=tooltips)
     others = base.transform_filter(alt.datum.group == 'Outros filmes').mark_circle(
         size=45, color='#94a3b8', opacity=0.4)
     selected = base.transform_filter(alt.datum.group != 'Outros filmes').mark_point(
@@ -108,20 +128,39 @@ def show_embedding_map(service, rankings, query, query_vector):
     ).mark_text(align='left', dx=10, dy=-12, limit=260).encode(
         text=alt.condition(alt.datum.group == 'Sua busca', alt.value('Sua busca'),
                            alt.Text('title:N')))
-    chart = (others + selected + labels).properties(height=520).interactive()
-    st.altair_chart(chart, use_container_width=True)
+    chart = (others + selected + labels).properties(height=520)
+    if radial:
+        # Um quadro quadrado com domínios iguais preserva as distâncias em pixels.
+        chart = chart.properties(width=520, autosize=alt.AutoSizeParams(type='pad'))
+    else:
+        chart = chart.interactive()
+    st.altair_chart(chart, use_container_width=not radial)
     st.caption('Azul: melhores resultados semânticos · Losango laranja: sua busca · '
-               'Cinza: restante do catálogo. Passe o mouse nos pontos; use a roda '
-               'para aproximar e arraste para explorar.')
-    st.info('Este mapa é uma aproximação: ao resumir tantos números em apenas dois, '
-            'algumas distâncias mudam. O ranking é calculado com o embedding completo, '
-            'por similaridade de cosseno; a ordem visual pode ser diferente.')
+               'Cinza: restante do catálogo. Passe o mouse nos pontos.' +
+               ('' if radial else ' Use a roda para aproximar e arraste para explorar.'))
+    if radial:
+        st.info('A distância ao centro corresponde à similaridade usada no ranking: '
+                'melhores resultados ficam mais perto, e empates têm o mesmo raio. '
+                'A direção é baseada no PCA; as distâncias entre filmes são aproximadas. '
+                'O mapa se reorganiza a cada consulta.')
+    else:
+        st.info('Este mapa é uma aproximação: ao resumir tantos números em apenas dois, '
+                'algumas distâncias mudam. O ranking é calculado com o embedding completo, '
+                'por similaridade de cosseno; a ordem visual pode ser diferente.')
     if hits:
         st.markdown('**Mais parecidos no espaço completo dos embeddings**')
         st.dataframe([{'Posição': movie['rank'], 'Filme': movie['title'],
                        'Cosseno': round(movie['score'], 4)} for movie in hits],
                      hide_index=True, use_container_width=True)
     with st.expander('Como este mapa foi feito?'):
+        if radial:
+            st.write('Para cada filme, calculamos o raio como sqrt(2 × (1 − cosseno)). '
+                     'Como os embeddings são normalizados, esse valor é a distância '
+                     'euclidiana original entre filme e consulta. O ângulo vem da direção '
+                     'do filme em relação à consulta no PCA. Pontos coincidentes no PCA '
+                     'recebem direções distribuídas de forma determinística. '
+                     'Os dois eixos têm a mesma escala e o gráfico é quadrado.')
+            return
         st.write(f'Cada embedding tem {service.semantic.embeddings.shape[1]} dimensões. '
                  f'Usamos PCA para resumi-las em duas, preservando '
                  f'{projection.retained_variance:.1%} da variação dos filmes. '
@@ -248,7 +287,11 @@ def main():
                 st.session_state.pop('query_vector', None)
 
     rankings = st.session_state.get('rankings')
-    ranking_tab, map_tab = st.tabs(['🏆 Comparar buscas', '🗺️ Mapa de significados'])
+    ranking_tab, map_tab, radial_tab = st.tabs(
+        ['🏆 Comparar buscas', '🗺️ Mapa de significados', '🎯 Mapa radial'])
+    with radial_tab:
+        show_embedding_map(service, rankings, st.session_state.get('last_query', ''),
+                           st.session_state.get('query_vector'), radial=True)
     with map_tab:
         show_embedding_map(service, rankings, st.session_state.get('last_query', ''),
                            st.session_state.get('query_vector'))

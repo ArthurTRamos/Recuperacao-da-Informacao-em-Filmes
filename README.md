@@ -45,6 +45,11 @@ Os três atalhos demonstram busca semântica (Nemo), léxica (Harry Potter) e ge
 (Toy Story). A aba **Mapa de significados** projeta os embeddings em 2D com PCA,
 destacando a consulta e os resultados semânticos. O mapa é uma aproximação;
 o ranking continua usando os vetores completos e a similaridade de cosseno.
+A aba **Mapa radial** coloca a consulta no centro e usa a distância original
+dos embeddings normalizados (`sqrt(2 × (1 − cosseno))`) como raio: filmes mais
+similares ficam mais perto do centro. O ângulo vem do PCA; as distâncias entre
+filmes são aproximadas. O mapa muda a cada consulta e mantém a mesma escala
+nos dois eixos. É possível filtrar para mostrar apenas os resultados semânticos.
 Veja o [roteiro de apresentação para crianças](ROTEIRO_APRESENTACAO.md).
 
 ## Atualizar o dataset
